@@ -35,8 +35,8 @@ class Reorg(nn.Module):
 class YOLOv2Neck(BaseModule, metaclass=ABCMeta):
     """YOLOv2Neck used in YOLO6D"""
     def __init__(self,
-                 in_channels: List[int],
-                 out_channels: Union[int, List[int]],
+                 in_channels: List[int] = [512, 1024],
+                 out_channels: Union[int, List[int]] = 1280,
                  deepen_factor: float = 1.0,
                  widen_factor: float = 1.0,
                  freeze_all: bool = False,
@@ -56,8 +56,8 @@ class YOLOv2Neck(BaseModule, metaclass=ABCMeta):
         self.out_layer = self.build_out_layer()
     
     def build_out_layer(self):
-        return ConvModule(in_channels=1280, 
-                          out_channels=1024,
+        return ConvModule(in_channels=1280,
+                          out_channels=self.out_channels,
                           kernel_size=3,
                           stride=1,
                           padding=1,
@@ -66,7 +66,7 @@ class YOLOv2Neck(BaseModule, metaclass=ABCMeta):
 
     def build_passthrough_layer(self):
         """build through layer"""
-        return nn.Sequential(ConvModule(in_channels=512, 
+        return nn.Sequential(ConvModule(in_channels=self.in_channels[0], 
                                         out_channels=64,
                                         kernel_size=3,
                                         stride=1,
@@ -80,9 +80,9 @@ class YOLOv2Neck(BaseModule, metaclass=ABCMeta):
         assert len(inputs) == len(self.in_channels)
         
         # Passthrough layer
-        pass_through_out = self.pass_through_layer(input[0])
-        result = torch.cat(pass_through_out, 
-                                     input[1])
+        pass_through_out = self.pass_through_layer(inputs[0])
+        result = torch.cat([pass_through_out, 
+                                     inputs[1]], dim=1)
         
         # Out layer
         result = self.out_layer(result)
