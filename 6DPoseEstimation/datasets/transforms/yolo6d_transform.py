@@ -1,6 +1,8 @@
 import os
 import random
 import numpy as np
+import mmcv
+import cv2
 from PIL import Image, ImageMath
 from mmyolo.registry import TRANSFORMS
 from mmcv.transforms import BaseTransform
@@ -23,135 +25,49 @@ def change_background(img, mask, bg):
         return out
 
 
-def data_augmentation(img, shape, jitter, hue, saturation, exposure):
-
-    ow, oh = img.size
-    
-    dw =int(ow*jitter)
-    dh =int(oh*jitter)
-
-    pleft  = random.randint(-dw, dw)
-    pright = random.randint(-dw, dw)
-    ptop   = random.randint(-dh, dh)
-    pbot   = random.randint(-dh, dh)
-
-    swidth =  ow - pleft - pright
-    sheight = oh - ptop - pbot
-
-    sx = float(swidth)  / ow
-    sy = float(sheight) / oh
-    
-    flip = random.randint(1,10000)%2
-    cropped = img.crop( (pleft, ptop, pleft + swidth - 1, ptop + sheight - 1))
-
-    dx = (float(pleft)/ow)/sx
-    dy = (float(ptop) /oh)/sy
-
-    sized = cropped.resize(shape)
-
-    img = random_distort_image(sized, hue, saturation, exposure)
-    
-    return img, flip, dx,dy,sx,sy 
-
-
-def random_distort_image(im, hue, saturation, exposure):
-    dhue = random.uniform(-hue, hue)
-    dsat = rand_scale(saturation)
-    dexp = rand_scale(exposure)
-    res  = distort_image(im, dhue, dsat, dexp)
-    return res
-
-def distort_image(im, hue, sat, val):
-    im = im.convert('HSV')
-    cs = list(im.split())
-    cs[1] = cs[1].point(lambda i: i * sat)
-    cs[2] = cs[2].point(lambda i: i * val)
-    
-    def change_hue(x):
-        x += hue*255
-        if x > 255:
-            x -= 255
-        if x < 0:
-            x += 255
-        return x
-    cs[0] = cs[0].point(change_hue)
-    im = Image.merge(im.mode, tuple(cs))
-
-    im = im.convert('RGB')
-    return im
-
-
-def rand_scale(s):
-    scale = random.uniform(1, s)
-    if(random.randint(1,10000)%2): 
-        return scale
-    return 1./scale
-
-
 @TRANSFORMS.register_module()
 class CopyPaste6D(BaseTransform):
     """change the background"""
     def __init__(self,
                  shape,
-                 jitter,
-                 hue,
-                 saturation,
-                 exposure,
                  num_keypoints,
                  max_num_gt
     ):
         self.shape = shape
-        self.jitter = jitter
-        self.hue = hue
-        self.saturation = saturation
-        self.exposure = exposure
         self.num_keypoints = num_keypoints
         self.max_num_gt = max_num_gt
 
     def transform(self, results:dict) -> dict:
         ## data augmentation
-        imgpath = results['img_path']
+        img = results['img']
         maskpath = results['mask_path']
         bgpath = results['bg_path']
         
-        img = Image.open(imgpath).convert('RGB')
-        mask = Image.open(maskpath).convert('RGB')
-        bg = Image.open(bgpath).convert('RGB')
+        # opencv -> PIL 
+        img = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+        mask = Image.open(maskpath)
+        bg = Image.open(bgpath)
         
         img = change_background(img, mask, bg)
-        img,flip,dx,dy,sx,sy = data_augmentation(img, self.shape, self.jitter,
-                                                 self.hue, self.saturation,
-                                                 self.exposure)
-        results = self.fill_truth_detection(results, dx, dy, 1./sx, 1./sy,
-                                          self.num_keypoints, self.max_num_gt)
+        img = cv2.cvtColor(np.asarray(img), cv2.COLOR_RGB2BGR)
         
-        return results
-    
-    def fill_truth_detection(self, results, dx, dy, sx, sy, num_keypoints):
-        cc = 0
-        for i, instance in enumerate(results['instances']):
-            
-            bs = np.stack([instance['center_norm'].unsqueeze(), 
-                           instance['corners_norm']])
-            xs = list()
-            ys = list()
-            for j in range(num_keypoints):
-                xs.append(bs[2*j])
-                ys.append(bs[2*j+1])
+        # match shape
+        if self.shape is not None:
+            oh, ow = img.shape[:2]
+            sx = self.shape[0]/ow
+            sy = self.shape[1]/oh
+            scale_ratio = max(sx, sy)
 
-            # Make sure the centroid of the object/hand is within image
-            xs[0] = min(0.999, max(0, xs[0] * sx - dx)) 
-            ys[0] = min(0.999, max(0, ys[0] * sy - dy)) 
+            img = mmcv.imresize(img, (int(ow*scale_ratio),
+                                      int(oh*scale_ratio)))
+            img = img[0:self.shape[1], 0:self.shape[0]]
             
-            for j in range(1,num_keypoints):
-                xs[j] = xs[j] * sx - dx 
-                ys[j] = ys[j] * sy - dy 
+            results['gt_cpts_norm'][..., 0] *= scale_ratio
+            results['gt_cpts_norm'][..., 1] *= scale_ratio
             
-            for j in range(num_keypoints):
-                bs[2*j] = xs[j]
-                bs[2*j+1] = ys[j]
-            
-            results['instances'][i]['center_norm'] = bs[0, :]
-            results['instances'][i]['corners_norm'] = bs[1:num_keypoints, :]
+            results['gt_bboxes'] *= scale_ratio
 
+        # PIL -> opencv
+        results['img'] = img
+        
         return results

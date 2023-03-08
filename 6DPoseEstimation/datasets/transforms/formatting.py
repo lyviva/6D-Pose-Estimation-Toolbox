@@ -11,14 +11,16 @@ class Pack6DInputs(BaseTransform):
     mapping_table = {
         'gt_bboxes': 'bboxes',
         'gt_bboxes_labels': 'labels',
-        'gt_rotations': 'rotation',
-        'gt_translations': 'translation',
-        'gt_center': 'center',
-        'gt_corners': 'corners'
+        'gt_cpts_norm': 'cpts_norm'
+        # 'gt_rotations': 'rotation',
+        # 'gt_translations': 'translation',
+        # 'gt_center': 'center',
+        # 'gt_corners': 'corners'
     }
     
     def __init__(self, 
-                 meta_keys=('img_id', 'img_path', 'ori_shape', 'img_shape')):
+                 meta_keys=('img_id', 'img_path', 'ori_shape', 'img_shape',
+                            )):
         self.meta_keys = meta_keys
         
     def transform(self, results: dict) -> dict:
