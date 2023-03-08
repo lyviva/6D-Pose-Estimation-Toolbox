@@ -4,8 +4,8 @@ import torch.nn as nn
 from mmcv.cnn import ConvModule, MaxPool2d
 from mmyolo.registry import MODELS
 from mmdet.utils import ConfigType, OptMultiConfig
-from mmyolo.models import BaseBackbone
-from mmyolo.utils import make_divisible, make_round
+from .base_backbone import BaseBackbone
+from ..utils import make_divisible, make_round
 
 
 @MODELS.register_module()
@@ -29,7 +29,7 @@ class YOLOv2Darknet(BaseBackbone):
                  norm_eval: bool = False,
                  init_cfg: OptMultiConfig = None):
         super().__init__(
-            self.arch_setting[arch],
+            self.arch_settings[arch],
             deepen_factor,
             widen_factor,
             input_channels=input_channels,
@@ -43,7 +43,7 @@ class YOLOv2Darknet(BaseBackbone):
     
     def build_stem_layer(self) -> nn.Module:
         """Build a stem layer"""
-        stage = []
+        # stage = []
         conv_layer = ConvModule(in_channels=self.input_channels,
                                 out_channels=32,
                                 kernel_size=3,
@@ -51,9 +51,9 @@ class YOLOv2Darknet(BaseBackbone):
                                 padding=1,
                                 norm_cfg=self.norm_cfg,
                                 act_cfg=self.act_cfg)
-        stage.append(conv_layer)
+        # stage.append(conv_layer)
         
-        return stage
+        return conv_layer
     
     def build_stage_layer(self, stage_idx: int, setting: list) -> list:
         """Build a stage layer
@@ -79,7 +79,7 @@ class YOLOv2Darknet(BaseBackbone):
                                     norm_cfg=self.norm_cfg,
                                     act_cfg=self.act_cfg))
         elif num_blocks == 3:
-            stage.append(ConvModule(in_channels,
+            stage.append(nn.Sequential(ConvModule(in_channels,
                                     out_channels,
                                     kernel_size=3,
                                     stride=1,
@@ -90,7 +90,7 @@ class YOLOv2Darknet(BaseBackbone):
                                     in_channels,
                                     kernel_size=1,
                                     stride=1,
-                                    padding=1,
+                                    padding=0,
                                     norm_cfg=self.norm_cfg,
                                     act_cfg=self.act_cfg),
                          ConvModule(in_channels,
@@ -99,9 +99,9 @@ class YOLOv2Darknet(BaseBackbone):
                                     stride=1,
                                     padding=1,
                                     norm_cfg=self.norm_cfg,
-                                    act_cfg=self.act_cfg))
+                                    act_cfg=self.act_cfg)))
         elif num_blocks == 5:
-            stage.append(ConvModule(in_channels,
+            stage.append(nn.Sequential(ConvModule(in_channels,
                                     out_channels,
                                     kernel_size=3,
                                     stride=1,
@@ -112,7 +112,7 @@ class YOLOv2Darknet(BaseBackbone):
                                     in_channels,
                                     kernel_size=1,
                                     stride=1,
-                                    padding=1,
+                                    padding=0,
                                     norm_cfg=self.norm_cfg,
                                     act_cfg=self.act_cfg),
                          ConvModule(in_channels,
@@ -126,7 +126,7 @@ class YOLOv2Darknet(BaseBackbone):
                                     in_channels,
                                     kernel_size=1,
                                     stride=1,
-                                    padding=1,
+                                    padding=0,
                                     norm_cfg=self.norm_cfg,
                                     act_cfg=self.act_cfg),
                          ConvModule(in_channels,
@@ -135,9 +135,9 @@ class YOLOv2Darknet(BaseBackbone):
                                     stride=1,
                                     padding=1,
                                     norm_cfg=self.norm_cfg,
-                                    act_cfg=self.act_cfg))
+                                    act_cfg=self.act_cfg)))
         elif num_blocks == 7:
-            stage.append(ConvModule(in_channels,
+            stage.append(nn.Sequential(ConvModule(in_channels,
                                     out_channels,
                                     kernel_size=3,
                                     stride=1,
@@ -148,7 +148,7 @@ class YOLOv2Darknet(BaseBackbone):
                                     in_channels,
                                     kernel_size=1,
                                     stride=1,
-                                    padding=1,
+                                    padding=0,
                                     norm_cfg=self.norm_cfg,
                                     act_cfg=self.act_cfg),
                          ConvModule(in_channels,
@@ -162,7 +162,7 @@ class YOLOv2Darknet(BaseBackbone):
                                     in_channels,
                                     kernel_size=1,
                                     stride=1,
-                                    padding=1,
+                                    padding=0,
                                     norm_cfg=self.norm_cfg,
                                     act_cfg=self.act_cfg),
                          ConvModule(in_channels,
@@ -185,5 +185,5 @@ class YOLOv2Darknet(BaseBackbone):
                                     stride=1,
                                     padding=1,
                                     norm_cfg=self.norm_cfg,
-                                    act_cfg=self.act_cfg))
+                                    act_cfg=self.act_cfg)))
         return stage
