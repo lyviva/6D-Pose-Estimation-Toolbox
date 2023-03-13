@@ -60,8 +60,9 @@ def yolo6d_collate(data_batch: Sequence,
         
         gt_cpts = datasamples.gt_instances.cpts_norm.view(1, -1)
         gt_labels = datasamples.gt_instances.labels
+        gt_conf = gt_labels.new_full((len(gt_labels), 1), 1)
         batch_idx = gt_labels.new_full((len(gt_labels), 1), i)
-        cpts_confs_labels = torch.cat((batch_idx, gt_cpts, gt_labels),
+        cpts_confs_labels = torch.cat((batch_idx, gt_labels, gt_cpts, gt_conf),
                                       dim=1)
         batch_cpts_confs_labels.append(cpts_confs_labels)
     
